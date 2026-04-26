@@ -963,80 +963,95 @@ export default function Page() {
   };
 
   const handleConsultSubmit = async (e) => {
-    e.preventDefault();
-    if (!diagnosis.suitable) return;
+  e.preventDefault();
+  if (!diagnosis.suitable) return;
 
-    if (!consultation.name.trim() || !consultation.phone.trim()) {
-      setSubmitMessage("이름과 전화번호를 입력해주세요.");
-      return;
+  if (!consultation.name.trim() || !consultation.phone.trim()) {
+    setSubmitMessage("이름과 전화번호를 입력해주세요.");
+    return;
+  }
+
+  if (!privacyAgreed) {
+    setSubmitMessage("개인정보처리방침 안내에 동의해주세요.");
+    return;
+  }
+
+  try {
+    setIsSubmitting(true);
+    setSubmitMessage("");
+
+    // ✅ 1. 상담신청 1건마다 고유 eventId 생성
+    const eventId =
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? `contact_${crypto.randomUUID()}`
+        : `contact_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
+    const response = await fetch("/api/consultation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        // ✅ 2. 서버 CAPI 전송용 eventId 추가
+        eventId,
+
+        applicant: consultation,
+        privacyAgreed,
+        diagnosis: {
+          occupation: diagnosis.occupation,
+          monthlyIncomeWon: diagnosis.monthlyIncomeWon,
+          maritalStatus: diagnosis.maritalStatus,
+          minorChildren: diagnosis.minorChildren,
+          hasVehicle: diagnosis.hasVehicle,
+          vehicleValueWon: diagnosis.vehicleValueWon,
+          assetsStatus: diagnosis.assetsStatus,
+          creditLoanWon: diagnosis.creditLoanWon,
+          securedLoanWon: diagnosis.securedLoanWon,
+          totalDebtWon: diagnosis.totalDebtWon,
+          realEstateValueWon: diagnosis.realEstateValueWon,
+          depositValueWon: diagnosis.depositValueWon,
+          totalAssetsWon: diagnosis.totalAssetsWon,
+          familySize: diagnosis.familySize,
+          minimumLivingCostWon: diagnosis.minimumLivingCostWon,
+          monthlyDisposableIncomeWon: diagnosis.monthlyDisposableIncomeWon,
+          expectedRepayment36Won: diagnosis.expectedRepayment36Won,
+          expectedTotalRepaymentWon: diagnosis.expectedTotalRepaymentWon,
+          estimatedInterestWon: diagnosis.estimatedInterestWon,
+          totalClaimWon: diagnosis.totalClaimWon,
+          expectedReductionWon: diagnosis.expectedReductionWon,
+          reductionRate: diagnosis.reductionRate,
+          suitable: diagnosis.suitable,
+          unsuitableReasons: diagnosis.unsuitableReasons,
+        },
+      }),
+    });
+
+    const data = await response.json();
+    if (!response.ok || !data.ok) {
+      throw new Error(data.message || "신청 전송에 실패했습니다.");
     }
 
-    if (!privacyAgreed) {
-      setSubmitMessage("개인정보처리방침 안내에 동의해주세요.");
-      return;
+    // ✅ 3. 신청 성공 후 같은 eventId로 Meta Pixel 이벤트 전송
+    if (typeof window !== "undefined" && typeof window.fbq === "function") {
+      window.fbq("track", "Contact", {}, { eventID: eventId });
     }
 
-    try {
-      setIsSubmitting(true);
-      setSubmitMessage("");
+    safeCapture("consultation submitted", {
+      source: "diagnosis_result",
+      diagnosis_source: diagnosisSourceRef.current,
+      suitable: diagnosis.suitable,
+      reduction_rate: Math.round(diagnosis.reductionRate || 0),
+      event_id: eventId,
+    });
 
-      const response = await fetch("/api/consultation", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          applicant: consultation,
-          privacyAgreed,
-          diagnosis: {
-            occupation: diagnosis.occupation,
-            monthlyIncomeWon: diagnosis.monthlyIncomeWon,
-            maritalStatus: diagnosis.maritalStatus,
-            minorChildren: diagnosis.minorChildren,
-            hasVehicle: diagnosis.hasVehicle,
-            vehicleValueWon: diagnosis.vehicleValueWon,
-            assetsStatus: diagnosis.assetsStatus,
-            creditLoanWon: diagnosis.creditLoanWon,
-            securedLoanWon: diagnosis.securedLoanWon,
-            totalDebtWon: diagnosis.totalDebtWon,
-            realEstateValueWon: diagnosis.realEstateValueWon,
-            depositValueWon: diagnosis.depositValueWon,
-            totalAssetsWon: diagnosis.totalAssetsWon,
-            familySize: diagnosis.familySize,
-            minimumLivingCostWon: diagnosis.minimumLivingCostWon,
-            monthlyDisposableIncomeWon: diagnosis.monthlyDisposableIncomeWon,
-            expectedRepayment36Won: diagnosis.expectedRepayment36Won,
-            expectedTotalRepaymentWon: diagnosis.expectedTotalRepaymentWon,
-            estimatedInterestWon: diagnosis.estimatedInterestWon,
-            totalClaimWon: diagnosis.totalClaimWon,
-            expectedReductionWon: diagnosis.expectedReductionWon,
-            reductionRate: diagnosis.reductionRate,
-            suitable: diagnosis.suitable,
-            unsuitableReasons: diagnosis.unsuitableReasons,
-          },
-        }),
-      });
-
-      const data = await response.json();
-      if (!response.ok || !data.ok) {
-        throw new Error(data.message || "신청 전송에 실패했습니다.");
-      }
-
-      safeCapture("consultation submitted", {
-        source: "diagnosis_result",
-        diagnosis_source: diagnosisSourceRef.current,
-        suitable: diagnosis.suitable,
-        reduction_rate: Math.round(diagnosis.reductionRate || 0),
-      });
-
-      setSubmitMessage("상담신청이 정상적으로 접수되었습니다.");
-      setConsultation({ name: "", phone: "" });
-      setPrivacyAgreed(false);
-      setPrivacyOpen(false);
-    } catch (error) {
-      setSubmitMessage(error.message || "신청 전송 중 오류가 발생했습니다.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+    setSubmitMessage("상담신청이 정상적으로 접수되었습니다.");
+    setConsultation({ name: "", phone: "" });
+    setPrivacyAgreed(false);
+    setPrivacyOpen(false);
+  } catch (error) {
+    setSubmitMessage(error.message || "신청 전송 중 오류가 발생했습니다.");
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   const resultDate = new Date().toLocaleDateString("ko-KR");
 

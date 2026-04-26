@@ -1,5 +1,6 @@
 import { google } from "googleapis";
 import { NextResponse } from "next/server";
+import { sendMetaCapiEvent } from "../../../lib/meta-capi";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,12 +35,14 @@ export async function POST(request) {
   try {
     const body = await request.json();
 
-    const applicant = body?.applicant || {};
+    const eventId = body.eventId;
+    const applicant = body.applicant || {};
     const diagnosis = body?.diagnosis || {};
     const privacyAgreed = !!body?.privacyAgreed;
 
-    const name = String(applicant?.name || "").trim();
-    const phone = String(applicant?.phone || "").trim();
+    const name = applicant.name;
+    const phone = applicant.phone;
+    const email = applicant.email;
 
     if (!name || !phone) {
       return NextResponse.json(
@@ -89,10 +92,25 @@ const row = [
   },
 });
 
-    return NextResponse.json({
-      ok: true,
-      message: "상담신청이 정상적으로 접수되었습니다.",
-    });
+// 구글시트 저장 성공 후 Meta CAPI 전송
+try {
+  await sendMetaCapiEvent({
+    request,
+    eventId: eventId || `contact_${Date.now()}`,
+    eventName: "Contact",
+    phone,
+    email,
+    sourceUrl: request.headers.get("referer") || process.env.NEXT_PUBLIC_SITE_URL,
+  });
+} catch (capiError) {
+  console.error("Meta CAPI 전송 오류:", capiError);
+}
+
+return NextResponse.json({
+  ok: true,
+  message: "상담신청이 정상적으로 접수되었습니다.",
+});
+
   } catch (error) {
     console.error("consultation route error:", error);
 
