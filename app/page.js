@@ -33,7 +33,7 @@ const MINIMUM_LIVING_COST_2026 = Object.fromEntries(
   ])
 );
 
-const OCCUPATIONS = ["직장인", "프리랜서", "사업자", "알바", "휴직", "무직"];
+const OCCUPATIONS = ["직장인", "프리랜서", "사업자", "알바", "무직"];
 const MARITAL_OPTIONS = ["미혼", "기혼"];
 const YES_NO = ["있음", "없음"];
 const CHILD_OPTIONS = [0, 1, 2, 3, 4];
@@ -667,8 +667,8 @@ function getDiagnosisPayload(form) {
     totalClaimWon > 0 ? (expectedReductionWon / totalClaimWon) * 100 : 0;
 
   const reasons = [];
-  if (["휴직", "무직"].includes(form.occupation)) {
-    reasons.push("현재 직업이 휴직 또는 무직으로 선택되었습니다.");
+  if (["무직"].includes(form.occupation)) {
+    reasons.push("현재 직업이 무직으로 선택되었습니다.");
   }
   if (monthlyIncomeWon < 1530000) {
     reasons.push("월 평균 소득이 153만원 미만으로 입력되었습니다.");
@@ -734,6 +734,7 @@ export default function Page() {
   const [progress, setProgress] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState("");
+  const [successPopupOpen, setSuccessPopupOpen] = useState(false);
   const [consultation, setConsultation] = useState({ name: "", phone: "" });
   const [privacyAgreed, setPrivacyAgreed] = useState(false);
   const [privacyOpen, setPrivacyOpen] = useState(false);
@@ -1043,6 +1044,7 @@ export default function Page() {
     });
 
     setSubmitMessage("상담신청이 정상적으로 접수되었습니다.");
+    setSuccessPopupOpen(true);
     setConsultation({ name: "", phone: "" });
     setPrivacyAgreed(false);
     setPrivacyOpen(false);
